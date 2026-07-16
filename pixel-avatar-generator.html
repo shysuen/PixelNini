@@ -1,0 +1,813 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>256 像素头像生成器</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17212b;
+      --muted: #66727d;
+      --line: #c7d0d7;
+      --page: #eef1f3;
+      --panel: #ffffff;
+      --accent: #087f8c;
+      --accent-dark: #05646e;
+      --warning: #f2c14e;
+      --danger: #b2342a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--page);
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    select { font: inherit; }
+
+    button {
+      min-height: 40px;
+      padding: 8px 11px;
+      color: inherit;
+      background: #f7f9fa;
+      border: 1px solid #aeb8c1;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    button:hover { background: #e8edf0; }
+    button:active { transform: translateY(1px); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 3px solid rgba(242, 193, 78, 0.75);
+      outline-offset: 2px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 64px;
+      padding: 12px clamp(14px, 4vw, 48px);
+      color: #ffffff;
+      background: var(--ink);
+      border-bottom: 4px solid var(--warning);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(19px, 2.5vw, 27px);
+    }
+
+    .badge {
+      flex: 0 0 auto;
+      padding: 5px 8px;
+      color: var(--ink);
+      background: var(--warning);
+      border-radius: 4px;
+      font: 700 12px Consolas, monospace;
+      white-space: nowrap;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(280px, 560px) minmax(270px, 360px);
+      justify-content: center;
+      align-items: start;
+      gap: 24px;
+      width: min(100%, 1040px);
+      margin: 0 auto;
+      padding: 28px 20px 40px;
+    }
+
+    .stage,
+    .controls {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      box-shadow: 0 10px 30px rgba(23, 33, 43, 0.12);
+    }
+
+    .stage { padding: clamp(12px, 3vw, 24px); }
+
+    .canvas-wrap {
+      width: 100%;
+      max-width: 512px;
+      margin: 0 auto;
+      aspect-ratio: 1;
+      overflow: hidden;
+      background: #dbe1e5;
+      border: 2px solid var(--ink);
+      border-radius: 2px;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 11px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status-row output {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .controls { overflow: hidden; }
+
+    .section {
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section:last-child { border-bottom: 0; }
+
+    .section-title {
+      display: block;
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .seed-row,
+    .actions,
+    .tools,
+    .options {
+      display: grid;
+      gap: 8px;
+    }
+
+    .seed-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .actions,
+    .options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tools { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .full { grid-column: 1 / -1; }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      min-height: 40px;
+      padding: 8px 10px;
+      color: var(--ink);
+      background: #ffffff;
+      border: 1px solid #aeb8c1;
+      border-radius: 4px;
+    }
+
+    .primary {
+      color: #ffffff;
+      background: var(--accent);
+      border-color: var(--accent-dark);
+      font-weight: 750;
+    }
+
+    .primary:hover { background: var(--accent-dark); }
+
+    .active {
+      color: #ffffff;
+      background: var(--ink);
+      border-color: var(--ink);
+    }
+
+    .active:hover { background: #273746; }
+    .danger { color: var(--danger); }
+
+    .color-row {
+      display: grid;
+      grid-template-columns: 52px minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    input[type="color"] {
+      width: 52px;
+      height: 42px;
+      padding: 3px;
+      background: #ffffff;
+      border: 1px solid #aeb8c1;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .palette {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .swatch {
+      min-width: 0;
+      min-height: 0;
+      width: 100%;
+      padding: 0;
+      aspect-ratio: 1;
+      background: var(--swatch);
+      border: 2px solid #ffffff;
+      border-radius: 3px;
+      box-shadow: 0 0 0 1px #9aa5ae;
+    }
+
+    .swatch:hover { background: var(--swatch); }
+    .swatch.selected { box-shadow: 0 0 0 3px var(--warning); }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 40px;
+      padding: 8px 10px;
+      background: #f7f9fa;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle input { accent-color: var(--accent); }
+
+    @media (max-width: 820px) {
+      main {
+        grid-template-columns: minmax(0, 560px);
+        padding-top: 18px;
+      }
+    }
+
+    @media (max-width: 440px) {
+      header { padding-inline: 12px; }
+      main { padding-inline: 10px; }
+      .stage { padding: 10px; }
+      .tools {
+        grid-template-columns: repeat(4, minmax(58px, 1fr));
+        overflow-x: auto;
+      }
+      .palette {
+        grid-template-columns: repeat(8, minmax(25px, 1fr));
+        overflow-x: auto;
+        padding: 2px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>像素头像生成器</h1>
+    <span class="badge">PNG 256 × 256</span>
+  </header>
+
+  <main>
+    <section class="stage" aria-label="头像画布">
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="canvas" width="256" height="256" aria-label="可编辑像素头像"></canvas>
+      </div>
+      <div class="status-row">
+        <output id="coordinates">x: -- · y: --</output>
+        <output id="status">已就绪</output>
+      </div>
+    </section>
+
+    <aside class="controls" aria-label="编辑工具">
+      <section class="section">
+        <label class="section-title" for="seed">随机种子</label>
+        <div class="seed-row">
+          <input id="seed" type="text" maxlength="48" value="PTX-17" autocomplete="off">
+          <button id="randomSeed" type="button" title="随机种子" aria-label="随机种子">↻</button>
+        </div>
+        <div class="actions" style="margin-top: 8px">
+          <button id="generate" class="primary full" type="button">生成头像</button>
+          <button id="undo" type="button">撤销</button>
+          <button id="redo" type="button">重做</button>
+        </div>
+      </section>
+
+      <section class="section">
+        <span class="section-title">绘制工具</span>
+        <div class="tools" role="toolbar" aria-label="绘制工具">
+          <button class="tool active" data-tool="pencil" type="button">画笔</button>
+          <button class="tool" data-tool="eraser" type="button">橡皮</button>
+          <button class="tool" data-tool="fill" type="button">填充</button>
+          <button class="tool" data-tool="picker" type="button">取色</button>
+        </div>
+        <div class="color-row">
+          <input id="color" type="color" value="#17212b" aria-label="当前颜色">
+          <select id="brush" aria-label="画笔大小">
+            <option value="1">1 像素画笔</option>
+            <option value="2">2 像素画笔</option>
+            <option value="3">3 像素画笔</option>
+          </select>
+        </div>
+        <div class="palette" id="palette" aria-label="常用颜色"></div>
+      </section>
+
+      <section class="section">
+        <span class="section-title">画布选项</span>
+        <div class="options">
+          <label class="toggle"><input id="mirror" type="checkbox" checked>镜像绘制</label>
+          <label class="toggle"><input id="grid" type="checkbox" checked>显示网格</label>
+          <button id="clear" class="danger full" type="button">清空画布</button>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="actions">
+          <button id="saveJson" type="button">导出数据</button>
+          <button id="loadJson" type="button">导入数据</button>
+          <button id="download" class="primary full" type="button">下载 PNG</button>
+        </div>
+        <input id="file" type="file" accept="application/json,.json" hidden>
+      </section>
+    </aside>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const OUTPUT_SIZE = 256;
+      const GRID_SIZE = 32;
+      const CELL_SIZE = OUTPUT_SIZE / GRID_SIZE;
+      const MAX_HISTORY = 60;
+      const PALETTE = [
+        "#17212b", "#ffffff", "#ef6351", "#f2c14e",
+        "#087f8c", "#52b788", "#6c5ce7", "#e07a5f",
+        "#f4c7a1", "#c68642", "#8d5524", "#3c2a21",
+        "#5f6caf", "#4ea8de", "#ff8fab", "#8ac926"
+      ];
+
+      const $ = id => document.getElementById(id);
+      const canvas = $("canvas");
+      const context = canvas.getContext("2d");
+      const seedInput = $("seed");
+      const colorInput = $("color");
+      const brushInput = $("brush");
+      const mirrorInput = $("mirror");
+      const gridInput = $("grid");
+      const statusOutput = $("status");
+      const coordinateOutput = $("coordinates");
+      const undoButton = $("undo");
+      const redoButton = $("redo");
+      const fileInput = $("file");
+
+      let pixels = makeGrid();
+      let activeTool = "pencil";
+      let pointerDown = false;
+      let strokeChanged = false;
+      let history = [];
+      let historyIndex = -1;
+
+      function makeGrid(fill = null) {
+        return Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(fill));
+      }
+
+      function cloneGrid(grid = pixels) {
+        return grid.map(row => row.slice());
+      }
+
+      function setStatus(message) {
+        statusOutput.textContent = message;
+      }
+
+      function hashSeed(text) {
+        let hash = 2166136261;
+        for (let index = 0; index < text.length; index += 1) {
+          hash ^= text.charCodeAt(index);
+          hash = Math.imul(hash, 16777619);
+        }
+        return hash >>> 0;
+      }
+
+      function createRandom(seed) {
+        let state = seed || 0x6d2b79f5;
+        return () => {
+          state += 0x6d2b79f5;
+          let value = state;
+          value = Math.imul(value ^ (value >>> 15), value | 1);
+          value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+          return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function pick(random, values) {
+        return values[Math.floor(random() * values.length)];
+      }
+
+      function randomInteger(random, minimum, maximum) {
+        return Math.floor(random() * (maximum - minimum + 1)) + minimum;
+      }
+
+      function putPixel(x, y, color) {
+        if (x >= 0 && y >= 0 && x < GRID_SIZE && y < GRID_SIZE) pixels[y][x] = color;
+      }
+
+      function fillRectangle(x, y, width, height, color) {
+        for (let row = y; row < y + height; row += 1) {
+          for (let column = x; column < x + width; column += 1) {
+            putPixel(column, row, color);
+          }
+        }
+      }
+
+      function generateAvatar() {
+        const seed = seedInput.value.trim() || "pixel-avatar";
+        const random = createRandom(hashSeed(seed));
+        const background = pick(random, ["#bde0fe", "#caffbf", "#ffd6a5", "#e7c6ff", "#ffe5ec", "#b8f2e6"]);
+        const skin = pick(random, ["#f4c7a1", "#dca06d", "#c68642", "#8d5524", "#5c3a21"]);
+        const hair = pick(random, ["#17212b", "#3c2a21", "#7f5539", "#d17b49", "#e9c46a", "#4a4e69"]);
+        const shirt = pick(random, ["#087f8c", "#ef6351", "#5f6caf", "#52b788", "#e76f51", "#6c5ce7"]);
+        const outline = "#17212b";
+
+        pixels = makeGrid(background);
+        fillRectangle(8, 27, 16, 5, shirt);
+        fillRectangle(6, 29, 20, 3, shirt);
+        fillRectangle(13, 24, 6, 5, skin);
+
+        for (let y = 7; y <= 24; y += 1) {
+          const inset = y < 9 ? 3 : y < 12 ? 1 : y > 22 ? 2 : 0;
+          fillRectangle(8 + inset, y, 16 - inset * 2, 1, skin);
+        }
+
+        fillRectangle(6, 14, 2, 6, skin);
+        fillRectangle(24, 14, 2, 6, skin);
+
+        for (let y = 6; y <= 11; y += 1) {
+          const inset = y === 6 ? 4 : y === 7 ? 2 : 0;
+          fillRectangle(8 + inset, y, 16 - inset * 2, 1, hair);
+        }
+
+        const hairStyle = randomInteger(random, 0, 3);
+        if (hairStyle === 0) {
+          fillRectangle(8, 10, 3, 6, hair);
+          fillRectangle(21, 10, 3, 6, hair);
+        } else if (hairStyle === 1) {
+          for (let x = 9; x <= 22; x += 2) putPixel(x, 11 + x % 3, hair);
+        } else if (hairStyle === 2) {
+          fillRectangle(8, 9, 4, 9, hair);
+          fillRectangle(21, 9, 3, 8, hair);
+        } else {
+          [13, 15, 17].forEach(x => putPixel(x, 11, hair));
+          [14, 16, 18].forEach(x => putPixel(x, 12, hair));
+        }
+
+        const eyeY = randomInteger(random, 15, 16);
+        const eyeColor = random() > 0.78 ? "#4ea8de" : outline;
+        putPixel(12, eyeY, eyeColor);
+        putPixel(19, eyeY, eyeColor);
+
+        if (random() > 0.45) {
+          putPixel(11, eyeY - 1, outline);
+          putPixel(20, eyeY - 1, outline);
+        }
+
+        putPixel(15, 19, "#b5654d");
+        putPixel(16, 19, "#b5654d");
+
+        const mouthStyle = randomInteger(random, 0, 2);
+        if (mouthStyle === 0) {
+          putPixel(14, 22, outline);
+          putPixel(15, 23, outline);
+          putPixel(16, 23, outline);
+          putPixel(17, 22, outline);
+        } else if (mouthStyle === 1) {
+          fillRectangle(14, 22, 4, 1, outline);
+        } else {
+          putPixel(15, 22, "#ef6351");
+          putPixel(16, 22, "#ef6351");
+        }
+
+        if (random() > 0.66) {
+          const frame = random() > 0.5 ? outline : "#e07a5f";
+          fillRectangle(10, eyeY - 1, 5, 3, frame);
+          fillRectangle(17, eyeY - 1, 5, 3, frame);
+          fillRectangle(15, eyeY, 2, 1, frame);
+          putPixel(12, eyeY, eyeColor);
+          putPixel(19, eyeY, eyeColor);
+        }
+
+        pushHistory();
+        render();
+        setStatus(`已生成：${seed}`);
+      }
+
+      function render(showGrid = gridInput.checked) {
+        context.clearRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+
+        for (let y = 0; y < GRID_SIZE; y += 1) {
+          for (let x = 0; x < GRID_SIZE; x += 1) {
+            const color = pixels[y][x];
+            if (!color) continue;
+            context.fillStyle = color;
+            context.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+          }
+        }
+
+        if (showGrid) {
+          context.save();
+          context.strokeStyle = "rgba(23, 33, 43, 0.16)";
+          context.lineWidth = 1;
+          context.beginPath();
+          for (let index = 0; index <= GRID_SIZE; index += 1) {
+            const position = index * CELL_SIZE + 0.5;
+            context.moveTo(position, 0);
+            context.lineTo(position, OUTPUT_SIZE);
+            context.moveTo(0, position);
+            context.lineTo(OUTPUT_SIZE, position);
+          }
+          context.stroke();
+          context.restore();
+        }
+      }
+
+      function pushHistory() {
+        history = history.slice(0, historyIndex + 1);
+        history.push(cloneGrid());
+        if (history.length > MAX_HISTORY) history.shift();
+        historyIndex = history.length - 1;
+        updateHistoryButtons();
+      }
+
+      function updateHistoryButtons() {
+        undoButton.disabled = historyIndex <= 0;
+        redoButton.disabled = historyIndex >= history.length - 1;
+      }
+
+      function restoreHistory(index) {
+        if (index < 0 || index >= history.length) return;
+        historyIndex = index;
+        pixels = cloneGrid(history[index]);
+        render();
+        updateHistoryButtons();
+      }
+
+      function eventToCell(event) {
+        const bounds = canvas.getBoundingClientRect();
+        return {
+          x: Math.max(0, Math.min(GRID_SIZE - 1, Math.floor((event.clientX - bounds.left) / bounds.width * GRID_SIZE))),
+          y: Math.max(0, Math.min(GRID_SIZE - 1, Math.floor((event.clientY - bounds.top) / bounds.height * GRID_SIZE)))
+        };
+      }
+
+      function paintAt(x, y) {
+        const size = Number(brushInput.value);
+        const paintColor = activeTool === "eraser" ? null : colorInput.value;
+        const offset = Math.floor(size / 2);
+
+        for (let dy = 0; dy < size; dy += 1) {
+          for (let dx = 0; dx < size; dx += 1) {
+            const pixelX = x + dx - offset;
+            const pixelY = y + dy - offset;
+            if (pixelX < 0 || pixelY < 0 || pixelX >= GRID_SIZE || pixelY >= GRID_SIZE) continue;
+
+            if (pixels[pixelY][pixelX] !== paintColor) strokeChanged = true;
+            pixels[pixelY][pixelX] = paintColor;
+
+            if (mirrorInput.checked) {
+              const mirrorX = GRID_SIZE - 1 - pixelX;
+              if (pixels[pixelY][mirrorX] !== paintColor) strokeChanged = true;
+              pixels[pixelY][mirrorX] = paintColor;
+            }
+          }
+        }
+      }
+
+      function floodFill(startX, startY, replacement) {
+        const target = pixels[startY][startX];
+        if (target === replacement) return false;
+
+        const queue = [[startX, startY]];
+        const visited = new Set();
+
+        while (queue.length) {
+          const [x, y] = queue.pop();
+          const key = `${x},${y}`;
+          if (visited.has(key) || x < 0 || y < 0 || x >= GRID_SIZE || y >= GRID_SIZE) continue;
+          visited.add(key);
+          if (pixels[y][x] !== target) continue;
+          pixels[y][x] = replacement;
+          queue.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+        }
+
+        return true;
+      }
+
+      function chooseColor(selectedColor) {
+        colorInput.value = selectedColor;
+        document.querySelectorAll(".swatch").forEach(button => {
+          button.classList.toggle("selected", button.dataset.color.toLowerCase() === selectedColor.toLowerCase());
+        });
+      }
+
+      function startPointer(event) {
+        event.preventDefault();
+        canvas.setPointerCapture(event.pointerId);
+        pointerDown = true;
+        strokeChanged = false;
+        const { x, y } = eventToCell(event);
+
+        if (activeTool === "fill") {
+          if (floodFill(x, y, colorInput.value)) {
+            pushHistory();
+            render();
+          }
+          pointerDown = false;
+          return;
+        }
+
+        if (activeTool === "picker") {
+          const selectedColor = pixels[y][x];
+          if (selectedColor) chooseColor(selectedColor);
+          setStatus(selectedColor ? `已取色：${selectedColor}` : "该像素透明");
+          pointerDown = false;
+          return;
+        }
+
+        paintAt(x, y);
+        render();
+      }
+
+      function movePointer(event) {
+        const { x, y } = eventToCell(event);
+        coordinateOutput.textContent = `x: ${x} · y: ${y}`;
+        if (pointerDown && (activeTool === "pencil" || activeTool === "eraser")) {
+          paintAt(x, y);
+          render();
+        }
+      }
+
+      function endPointer() {
+        if (!pointerDown) return;
+        pointerDown = false;
+        if (strokeChanged) pushHistory();
+      }
+
+      function downloadBlob(blob, filename) {
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function downloadPng() {
+        const exportCanvas = document.createElement("canvas");
+        exportCanvas.width = OUTPUT_SIZE;
+        exportCanvas.height = OUTPUT_SIZE;
+        const exportContext = exportCanvas.getContext("2d");
+
+        for (let y = 0; y < GRID_SIZE; y += 1) {
+          for (let x = 0; x < GRID_SIZE; x += 1) {
+            if (!pixels[y][x]) continue;
+            exportContext.fillStyle = pixels[y][x];
+            exportContext.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+          }
+        }
+
+        exportCanvas.toBlob(blob => {
+          if (!blob) return;
+          const safeSeed = (seedInput.value.trim() || "avatar").replace(/[^a-zA-Z0-9_-]+/g, "-");
+          downloadBlob(blob, `pixel-avatar-${safeSeed}.png`);
+          setStatus("PNG 已导出");
+        }, "image/png");
+      }
+
+      function exportJson() {
+        const data = {
+          version: 1,
+          outputSize: OUTPUT_SIZE,
+          gridSize: GRID_SIZE,
+          seed: seedInput.value,
+          pixels
+        };
+        downloadBlob(new Blob([JSON.stringify(data)], { type: "application/json" }), "pixel-avatar.json");
+        setStatus("头像数据已导出");
+      }
+
+      function importJson(file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const data = JSON.parse(String(reader.result));
+            const validRows = Array.isArray(data.pixels)
+              && data.pixels.length === GRID_SIZE
+              && data.pixels.every(row => Array.isArray(row) && row.length === GRID_SIZE);
+            if (data.gridSize !== GRID_SIZE || !validRows) throw new Error("尺寸或数据不正确");
+
+            pixels = data.pixels.map(row => row.map(value => (
+              typeof value === "string" || value === null ? value : null
+            )));
+            if (typeof data.seed === "string") seedInput.value = data.seed;
+            pushHistory();
+            render();
+            setStatus("头像数据已导入");
+          } catch (error) {
+            setStatus(`导入失败：${error.message}`);
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      PALETTE.forEach(paletteColor => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "swatch";
+        button.dataset.color = paletteColor;
+        button.style.setProperty("--swatch", paletteColor);
+        button.title = paletteColor;
+        button.setAttribute("aria-label", `选择颜色 ${paletteColor}`);
+        button.addEventListener("click", () => chooseColor(paletteColor));
+        $("palette").appendChild(button);
+      });
+
+      document.querySelectorAll(".tool").forEach(button => {
+        button.addEventListener("click", () => {
+          activeTool = button.dataset.tool;
+          document.querySelectorAll(".tool").forEach(item => item.classList.toggle("active", item === button));
+          setStatus(button.textContent.trim());
+        });
+      });
+
+      $("generate").addEventListener("click", generateAvatar);
+      $("randomSeed").addEventListener("click", () => {
+        seedInput.value = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        generateAvatar();
+      });
+      $("clear").addEventListener("click", () => {
+        pixels = makeGrid();
+        pushHistory();
+        render();
+        setStatus("画布已清空");
+      });
+      $("download").addEventListener("click", downloadPng);
+      $("saveJson").addEventListener("click", exportJson);
+      $("loadJson").addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", () => {
+        if (fileInput.files[0]) importJson(fileInput.files[0]);
+        fileInput.value = "";
+      });
+      undoButton.addEventListener("click", () => restoreHistory(historyIndex - 1));
+      redoButton.addEventListener("click", () => restoreHistory(historyIndex + 1));
+      gridInput.addEventListener("change", () => render());
+      colorInput.addEventListener("input", () => chooseColor(colorInput.value));
+      seedInput.addEventListener("keydown", event => {
+        if (event.key === "Enter") generateAvatar();
+      });
+
+      canvas.addEventListener("pointerdown", startPointer);
+      canvas.addEventListener("pointermove", movePointer);
+      canvas.addEventListener("pointerup", endPointer);
+      canvas.addEventListener("pointercancel", endPointer);
+      canvas.addEventListener("pointerleave", event => {
+        coordinateOutput.textContent = "x: -- · y: --";
+        if (event.buttons === 0) endPointer();
+      });
+      $("canvasWrap").addEventListener("contextmenu", event => event.preventDefault());
+
+      document.addEventListener("keydown", event => {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+          event.preventDefault();
+          restoreHistory(event.shiftKey ? historyIndex + 1 : historyIndex - 1);
+        }
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
+          event.preventDefault();
+          restoreHistory(historyIndex + 1);
+        }
+      });
+
+      chooseColor(PALETTE[0]);
+      pushHistory();
+      generateAvatar();
+    })();
+  </script>
+</body>
+</html>
