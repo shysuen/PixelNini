@@ -4,6 +4,8 @@ A dependency-free, single-file pixel avatar generator built with HTML Canvas. Op
 
 The editor uses a **32 x 32 logical pixel grid**. Each logical pixel occupies an 8 x 8 area in the exported image, producing a final PNG size of **256 x 256 pixels**.
 
+![Sample](./sample-picture.png)
+
 ## Features
 
 - Generate reproducible pixel avatars from text seeds
